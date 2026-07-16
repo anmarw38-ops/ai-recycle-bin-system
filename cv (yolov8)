@@ -1,0 +1,48 @@
+import serial
+import time
+from ultralytics import YOLO
+import cv2
+
+# Serial communication setup
+ser = serial.Serial('COM10', 9600) 
+time.sleep(2) 
+
+# Load custom YOLOv8 model
+model = YOLO('yolov8s.pt') 
+
+cap = cv2.VideoCapture(0)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+        
+    results = model(frame, conf=0.65, verbose=False, stream=True)
+    annotated_frame = frame.copy()
+    
+    for result in results:
+        annotated_frame = result.plot()
+        
+        for box in result.boxes:
+            cls_id = int(box.cls[0])
+            class_name = model.names[cls_id].lower()
+            
+            # Send routing commands to ESP32
+            if class_name == 'bottle':
+                ser.write(b'P') 
+                print("Detected Plastic - Sending 'P'")
+                time.sleep(1) 
+                
+            elif class_name == 'cup': 
+                ser.write(b'M') 
+                print("Detected Metal - Sending 'M'")
+                time.sleep(1)
+    
+    cv2.imshow('Smart Bin - YOLOv8s', annotated_frame)
+    
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+ser.close()
+cap.release()
+cv2.destroyAllWindows()
