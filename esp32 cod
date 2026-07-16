@@ -1,0 +1,105 @@
+#define BLYNK_TEMPLATE_ID   "YOUR_TEMPLATE_ID"
+#define BLYNK_TEMPLATE_NAME "YOUR_TEMPLATE_NAME"
+#define BLYNK_AUTH_TOKEN    "YOUR_BLYNK_AUTH_TOKEN" // ضع التوكن الخاص بك هنا محلياً فقط
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+#include <ESP32Servo.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+char ssid[] = "YOUR_WIFI_SSID";     // اسم شبكة الواي فاي الخاصة بك
+char pass[] = "YOUR_WIFI_PASSWORD"; // رمز المرور لشبكتك 
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 32 
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+Servo sortingServo;
+const int servoPin = 18; 
+
+int plasticCount = 0;
+int metalCount = 0;
+
+void updateOLED(String mainStatus) {
+  display.clearDisplay();
+  
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.print(mainStatus);
+  
+  display.setTextSize(1);
+  display.setCursor(0, 22);
+  display.print("P: ");
+  display.print(plasticCount);
+  display.print("  |  M: ");
+  display.print(metalCount);
+  
+  display.display();
+}
+
+void setup() {
+  Serial.begin(9600);
+  
+  sortingServo.attach(servoPin);
+  sortingServo.write(90); 
+  
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
+    Serial.println(F("SSD1306 failed"));
+  }
+  
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(10, 8);
+  display.print("AI BIN");
+  display.display();
+  delay(2000);
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  
+  Blynk.virtualWrite(V0, plasticCount);
+  Blynk.virtualWrite(V1, metalCount);
+  Blynk.virtualWrite(V2, "Ready...");
+  
+  updateOLED("READY");
+}
+
+void loop() {
+  Blynk.run(); 
+  
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    
+    if (command == 'P') { 
+      plasticCount++;
+      
+      Blynk.virtualWrite(V0, plasticCount);
+      Blynk.virtualWrite(V2, "Sorting Plastic");
+      updateOLED("PLASTIC"); 
+      
+      sortingServo.write(0);
+      delay(2000);            
+      sortingServo.write(90); 
+      
+      Blynk.virtualWrite(V2, "Ready...");
+      updateOLED("READY");
+    } 
+    else if (command == 'M') { 
+      metalCount++;
+      
+      Blynk.virtualWrite(V1, metalCount);
+      Blynk.virtualWrite(V2, "Sorting Metal");
+      updateOLED("METAL"); 
+      
+      sortingServo.write(180);
+      delay(2000);            
+      sortingServo.write(90); 
+      
+      Blynk.virtualWrite(V2, "Ready...");
+      updateOLED("READY");
+    }
+  }
+}
